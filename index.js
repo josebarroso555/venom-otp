@@ -7,7 +7,6 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 
 // Almacenamiento simple en memoria (para pruebas):
-// codesStore["549381XXXXXXX"] = { code: "123456", expiresAt: 1731700000000 }
 const codesStore = {};
 
 // Generar un código numérico de 6 dígitos
@@ -19,25 +18,36 @@ function generateCode(length = 6) {
 
 let clientGlobal = null;
 
-// 🔐 Inicializar Venom
+// 🔐 Inicializar Venom (config especial para Railway)
 venom
   .create({
-    session: 'session-otp',   // mismo nombre que te sale en logs
+    session: 'session-otp',
     multidevice: true,
-    headless: false,          // ⬅ PARA PRIMERA VEZ: que se vea Chrome
-    logQR: true,              // muestra el QR en la terminal
+    headless: true,               // ⬅ OBLIGATORIO para servidores
+    logQR: true,                  // QR en logs
+    disableSpins: true,           // evita problemas en servidores remotos
+    browserArgs: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-extensions',
+      '--disable-gpu',
+      '--disable-infobars',
+      '--window-size=800,600',
+      '--disable-background-networking'
+    ]
   })
   .then((client) => {
     clientGlobal = client;
-    console.log('✅ Venom bot OTP iniciado');
+    console.log('✅ Venom bot OTP iniciado en Railway');
   })
   .catch((err) => {
-    console.error('Error al iniciar Venom:', err);
+    console.error('❌ Error al iniciar Venom:', err);
   });
 
-// Endpoint simple para probar que el server está vivo
+// Comprobar servidor vivo
 app.get('/', (req, res) => {
-  res.send('API OTP con Venom está corriendo ✅');
+  res.send('API OTP con Venom está corriendo en Railway 🚀');
 });
 
 /**
@@ -58,7 +68,7 @@ app.post('/send-code', async (req, res) => {
     }
 
     const code = generateCode(6).toString();
-    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutos
+    const expiresAt = Date.now() + 5 * 60 * 1000;
 
     codesStore[phone] = { code, expiresAt };
 
@@ -71,7 +81,7 @@ app.post('/send-code', async (req, res) => {
 
     res.json({ ok: true, message: 'Código enviado por WhatsApp' });
   } catch (err) {
-    console.error(err);
+    console.error('❌ Error al enviar código:', err);
     res.status(500).json({ error: 'Error al enviar el código' });
   }
 });
@@ -104,16 +114,16 @@ app.post('/verify-code', (req, res) => {
       return res.status(400).json({ error: 'Código incorrecto' });
     }
 
-    delete codesStore[phone]; // un solo uso
+    delete codesStore[phone];
 
-    // Acá podrías generar un JWT, marcar usuario como logueado, etc.
     res.json({ ok: true, message: 'Código válido, usuario autenticado' });
   } catch (err) {
-    console.error(err);
+    console.error('❌ Error al verificar código:', err);
     res.status(500).json({ error: 'Error al verificar el código' });
   }
 });
 
+// Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
 });
