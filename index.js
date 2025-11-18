@@ -6,10 +6,8 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-// Almacenamiento simple en memoria (para pruebas):
 const codesStore = {};
 
-// Generar un código numérico de 6 dígitos
 function generateCode(length = 6) {
   const min = 10 ** (length - 1);
   const max = 10 ** length - 1;
@@ -18,14 +16,16 @@ function generateCode(length = 6) {
 
 let clientGlobal = null;
 
-// 🔐 Inicializar Venom (config especial para Railway)
+// 🔐 Configuración optimizada para Railway
 venom
   .create({
     session: 'session-otp',
     multidevice: true,
-    headless: true,               // ⬅ OBLIGATORIO para servidores
-    logQR: true,                  // QR en logs
-    disableSpins: true,           // evita problemas en servidores remotos
+    headless: true,
+    logQR: true,
+    disableSpins: true,
+    // 🚀 USAR CHROME DEL SISTEMA (no descargar)
+    executablePath: '/usr/bin/google-chrome-stable',
     browserArgs: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -34,7 +34,10 @@ venom
       '--disable-gpu',
       '--disable-infobars',
       '--window-size=800,600',
-      '--disable-background-networking'
+      '--disable-background-networking',
+      '--disable-features=VizDisplayCompositor',
+      '--disable-software-rasterizer',
+      '--single-process' // ⬅ Importante en entornos con memoria limitada
     ]
   })
   .then((client) => {
@@ -45,16 +48,10 @@ venom
     console.error('❌ Error al iniciar Venom:', err);
   });
 
-// Comprobar servidor vivo
 app.get('/', (req, res) => {
   res.send('API OTP con Venom está corriendo en Railway 🚀');
 });
 
-/**
- * 1) ENVIAR CÓDIGO
- * POST /send-code
- * body: { phone: "549381XXXXXXX" }
- */
 app.post('/send-code', async (req, res) => {
   try {
     const { phone } = req.body;
@@ -86,11 +83,6 @@ app.post('/send-code', async (req, res) => {
   }
 });
 
-/**
- * 2) VERIFICAR CÓDIGO
- * POST /verify-code
- * body: { phone: "549381XXXXXXX", code: "123456" }
- */
 app.post('/verify-code', (req, res) => {
   try {
     const { phone, code } = req.body;
@@ -123,7 +115,6 @@ app.post('/verify-code', (req, res) => {
   }
 });
 
-// Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
 });
